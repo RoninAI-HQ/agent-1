@@ -1,19 +1,15 @@
-export const tools = [
-  {
-    name: "web_search",
-    description: "Search the web for information on a topic. Use this to research facts, find examples, get current data, or discover expert opinions for the blog article.",
-    input_schema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "The search query"
-        }
-      },
-      required: ["query"]
-    }
-  },
-  {
+import { EventTypes } from "@blog-agent/shared";
+
+/**
+ * Blog Writing Tools
+ *
+ * Tool implementations for the blog writing preset.
+ * Each tool updates working memory and emits events.
+ */
+
+export const saveResearchNote = {
+  name: "save_research_note",
+  schema: {
     name: "save_research_note",
     description: "Save an important piece of research or insight that should be included in the article. Use this to build up your research before writing.",
     input_schema: {
@@ -35,7 +31,26 @@ export const tools = [
       required: ["topic", "content"]
     }
   },
-  {
+  execute: async ({ topic, content, source }, { memory, emit }) => {
+    const note = {
+      topic,
+      content,
+      source: source || "research",
+      timestamp: Date.now()
+    };
+
+    memory.update("research", (research = []) => [...research, note]);
+    const totalNotes = memory.get("research").length;
+
+    emit(EventTypes.RESEARCH_ADDED, { note, totalNotes });
+
+    return { success: true, noteCount: totalNotes };
+  }
+};
+
+export const createOutline = {
+  name: "create_outline",
+  schema: {
     name: "create_outline",
     description: "Create a structured outline for the blog article. Do this after research is complete but before writing.",
     input_schema: {
@@ -67,7 +82,24 @@ export const tools = [
       required: ["title", "sections"]
     }
   },
-  {
+  execute: async ({ title, sections, target_length }, { memory, emit }) => {
+    const outline = { title, sections, target_length };
+    memory.set("outline", outline);
+
+    emit(EventTypes.OUTLINE_CREATED, { outline });
+
+    return {
+      success: true,
+      title,
+      sectionCount: sections.length,
+      sections: sections.map(s => s.heading)
+    };
+  }
+};
+
+export const writeSection = {
+  name: "write_section",
+  schema: {
     name: "write_section",
     description: "Write a specific section of the blog article based on the outline.",
     input_schema: {
@@ -85,7 +117,21 @@ export const tools = [
       required: ["section_heading", "content"]
     }
   },
-  {
+  execute: async ({ section_heading, content }, { memory }) => {
+    memory.update("sections", (sections = {}) => ({
+      ...sections,
+      [section_heading]: content
+    }));
+
+    const wordCount = content.split(/\s+/).length;
+
+    return { success: true, section: section_heading, wordCount };
+  }
+};
+
+export const compileDraft = {
+  name: "compile_draft",
+  schema: {
     name: "compile_draft",
     description: "Compile all written sections into a complete first draft.",
     input_schema: {
@@ -99,7 +145,27 @@ export const tools = [
       required: ["full_draft"]
     }
   },
-  {
+  execute: async ({ full_draft }, { memory, emit }) => {
+    memory.set("draft", full_draft);
+    const wordCount = full_draft.split(/\s+/).length;
+
+    emit(EventTypes.DRAFT_UPDATED, {
+      draft: full_draft,
+      wordCount,
+      preview: full_draft.substring(0, 500)
+    });
+
+    return {
+      success: true,
+      wordCount,
+      preview: full_draft.substring(0, 200) + "..."
+    };
+  }
+};
+
+export const editDraft = {
+  name: "edit_draft",
+  schema: {
     name: "edit_draft",
     description: "Edit and improve the current draft. Use this for revisions.",
     input_schema: {
@@ -122,7 +188,29 @@ export const tools = [
       required: ["edit_type", "edited_content", "changes_made"]
     }
   },
-  {
+  execute: async ({ edit_type, edited_content, changes_made }, { memory, emit }) => {
+    memory.set("draft", edited_content);
+    const wordCount = edited_content.split(/\s+/).length;
+
+    emit(EventTypes.DRAFT_UPDATED, {
+      draft: edited_content,
+      wordCount,
+      editType: edit_type,
+      changes: changes_made
+    });
+
+    return {
+      success: true,
+      editType: edit_type,
+      wordCount,
+      changes: changes_made
+    };
+  }
+};
+
+export const finalizeArticle = {
+  name: "finalize_article",
+  schema: {
     name: "finalize_article",
     description: "Mark the article as complete and finalized.",
     input_schema: {
@@ -139,5 +227,27 @@ export const tools = [
       },
       required: ["final_article", "word_count"]
     }
+  },
+  execute: async ({ final_article, word_count }, { memory, emit }) => {
+    memory.set("finalArticle", final_article);
+
+    emit(EventTypes.ARTICLE_FINALIZED, {
+      article: final_article,
+      wordCount: word_count
+    });
+
+    return { success: true, wordCount: word_count, complete: true };
   }
+};
+
+// Export all tools as an array for easy registration
+export const blogTools = [
+  saveResearchNote,
+  createOutline,
+  writeSection,
+  compileDraft,
+  editDraft,
+  finalizeArticle
 ];
+
+export default blogTools;

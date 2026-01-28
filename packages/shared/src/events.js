@@ -1,4 +1,4 @@
-// SSE Event Types for Blog Agent
+// SSE Event Types for Agent Framework
 
 export const EventTypes = {
   // Phase events
@@ -16,11 +16,17 @@ export const EventTypes = {
   TOOL_START: 'tool:start',
   TOOL_RESULT: 'tool:result',
 
-  // Content events
+  // Content events (used by blog preset, but available for any preset)
   RESEARCH_ADDED: 'research:added',
   OUTLINE_CREATED: 'outline:created',
   DRAFT_UPDATED: 'draft:updated',
   ARTICLE_FINALIZED: 'article:finalized',
+
+  // General preset events
+  NOTE_SAVED: 'note:saved',
+  THOUGHT_RECORDED: 'thought:recorded',
+  RESULT_STORED: 'result:stored',
+  TASK_COMPLETED: 'task:completed',
 
   // Agent lifecycle events
   AGENT_STARTED: 'agent:started',
@@ -32,12 +38,8 @@ export const EventTypes = {
   HEARTBEAT: 'heartbeat'
 };
 
-export const Phases = {
-  RESEARCH: 'research',
-  OUTLINE: 'outline',
-  WRITE: 'write',
-  EDIT: 'edit',
-  FINALIZE: 'finalize'
-};
+// Note: Phases are now preset-specific and defined in each preset configuration.
+// The blog preset defines: research, outline, write, edit, finalize
+// Other presets can define their own phases.
 
 export default EventTypes;
