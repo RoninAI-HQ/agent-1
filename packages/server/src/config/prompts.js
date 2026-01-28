@@ -1,7 +1,7 @@
 /**
- * General Preset Prompts
+ * Agent Prompts
  *
- * System prompts and prompt builders for the general-purpose preset.
+ * System prompts and prompt builders for the agent.
  */
 
 /**
@@ -55,7 +55,7 @@ Guidelines:
 }
 
 /**
- * Build a planning prompt for creating a general task plan
+ * Build a planning prompt for creating a task plan
  * @param {string} goal - The task goal/prompt
  * @param {string} toolDescriptions - Available tools description
  * @param {string} phaseList - Available phases

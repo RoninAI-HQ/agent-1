@@ -1,25 +1,15 @@
 import { Router } from "express";
 import sessionManager from "../services/SessionManager.js";
-import { listPresets } from "../presets/index.js";
 import { EventTypes } from "@blog-agent/shared";
 
 const router = Router();
 
-// List available presets
-router.get("/presets", (req, res) => {
-  const presets = listPresets();
-  res.json({ presets });
-});
-
 // Create a new session
 router.post("/sessions", (req, res) => {
-  const { preset = "general" } = req.body;
-
   try {
-    const session = sessionManager.createSession(preset);
+    const session = sessionManager.createSession();
     res.json({
       id: session.id,
-      preset: session.preset,
       status: session.status,
       createdAt: session.createdAt
     });
@@ -41,7 +31,6 @@ router.post("/sessions/:id/start", async (req, res) => {
     const session = await sessionManager.startAgent(id, topic);
     res.json({
       id: session.id,
-      preset: session.preset,
       status: session.status,
       topic: session.topic,
       startedAt: session.startedAt
@@ -70,7 +59,7 @@ router.get("/sessions/:id/events", (req, res) => {
   sessionManager.addSSEClient(id, res);
 
   // Send initial connected event
-  res.write(`event: ${EventTypes.CONNECTED}\ndata: ${JSON.stringify({ sessionId: id, preset: session.preset, status: session.status })}\n\n`);
+  res.write(`event: ${EventTypes.CONNECTED}\ndata: ${JSON.stringify({ sessionId: id, status: session.status })}\n\n`);
 
   // Send current state if agent is running or completed
   if (session.agent) {

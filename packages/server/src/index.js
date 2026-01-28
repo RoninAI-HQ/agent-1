@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import agentRoutes from "./routes/agent.js";
@@ -22,7 +23,7 @@ app.get("/health", (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Blog Agent Server running on http://localhost:${PORT}`);
+  console.log(`Agent Server running on http://localhost:${PORT}`);
   console.log(`API endpoints:`);
   console.log(`  POST /api/sessions - Create new session`);
   console.log(`  POST /api/sessions/:id/start - Start agent with topic`);

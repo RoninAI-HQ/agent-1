@@ -1,27 +1,27 @@
 import { stepPrompt, planningPrompt } from "./prompts.js";
-import webSearch from "../../tools/web_search.js";
-import saveNote from "../../tools/save_note.js";
-import think from "../../tools/think.js";
-import storeResult from "../../tools/store_result.js";
-import completeTask from "../../tools/complete_task.js";
+import webSearch from "../tools/web_search.js";
+import saveNote from "../tools/save_note.js";
+import think from "../tools/think.js";
+import storeResult from "../tools/store_result.js";
+import completeTask from "../tools/complete_task.js";
 import { EventTypes } from "@blog-agent/shared";
 
 /**
- * General Purpose Preset
+ * Agent Configuration
  *
- * A flexible preset for handling any task. Takes a prompt,
- * creates a plan, executes it step-by-step, and returns results.
+ * Configuration for the general-purpose agent that can handle any task
+ * by planning and executing steps.
  */
-const generalPreset = {
-  // Preset identification
-  name: "general",
+const agentConfig = {
+  // Agent identification
+  name: "agent",
   displayName: "General Purpose Agent",
   description: "A flexible agent that can handle any task by planning and executing steps",
 
   // Workflow phases
   phases: ["understand", "work", "deliver"],
 
-  // Tools to register
+  // Tools available to the agent
   tools: [
     "web_search",
     "save_note",
@@ -79,7 +79,7 @@ const generalPreset = {
     resultsCount: Object.keys(memory.get("results") || {}).length
   }),
 
-  // Custom events for this preset
+  // Events emitted by this agent
   events: {
     NOTE_SAVED: EventTypes.NOTE_SAVED,
     THOUGHT_RECORDED: EventTypes.THOUGHT_RECORDED,
@@ -94,4 +94,4 @@ const generalPreset = {
   stepMaxTokens: 4000
 };
 
-export default generalPreset;
+export default agentConfig;

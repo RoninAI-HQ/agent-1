@@ -1,35 +1,36 @@
+import "dotenv/config";
 import Agent from "./packages/server/src/core/Agent.js";
 import ToolRegistry from "./packages/server/src/core/ToolRegistry.js";
-import { getPreset, listPresets } from "./packages/server/src/presets/index.js";
+import agentConfig from "./packages/server/src/config/index.js";
 
 async function main() {
-  // Parse arguments
-  const presetName = process.argv[2] === "--preset" ? process.argv[3] : "general";
-  const topicArg = process.argv[2] === "--preset" ? process.argv.slice(4).join(" ") : process.argv.slice(2).join(" ");
+  // Get task from arguments
+  const task = process.argv.slice(2).join(" ");
 
-  const preset = getPreset(presetName);
-  if (!preset) {
-    console.error(`Unknown preset: ${presetName}`);
-    console.error("Available presets:", listPresets().map(p => p.name).join(", "));
-    process.exit(1);
-  }
-
-  // Require a topic/task
-  if (!topicArg) {
-    console.error("Usage: node index.js [--preset <name>] <task>");
+  if (!task) {
+    console.error("Usage: node index.js <task>");
     console.error("       node index.js \"What is the capital of France?\"");
-    console.error("       node index.js --preset blog \"Write about AI trends\"");
+    console.error("       node index.js \"Research the latest AI developments\"");
     process.exit(1);
   }
 
   // Create tool registry and register tools
   const registry = new ToolRegistry();
-  registry.registerMany(preset.toolImplementations);
+  registry.registerMany(agentConfig.toolImplementations);
 
   // Create agent
-  const agent = new Agent(preset, registry, { verbose: true });
+  const agent = new Agent(agentConfig, registry, { verbose: true });
 
-  // Set up event logging - common events
+  // Set up event logging
+  agent.on("plan:created", (data) => {
+    const { plan } = data;
+    console.log(`\n[PLAN] ${plan.approach}`);
+    console.log("Steps:");
+    for (const step of plan.steps) {
+      console.log(`  ${step.id}. [${step.phase}] ${step.action} (${step.tool})`);
+    }
+  });
+
   agent.on("phase:start", (data) => {
     console.log(`\n[PHASE] ${data.phase}${data.message ? `: ${data.message}` : ""}`);
   });
@@ -42,20 +43,6 @@ async function main() {
     console.log(`    [TOOL] ${data.tool}`);
   });
 
-  // Blog preset events
-  agent.on("research:added", (data) => {
-    console.log(`    [RESEARCH] ${data.note.topic}: ${data.note.content.substring(0, 80)}...`);
-  });
-
-  agent.on("outline:created", (data) => {
-    console.log(`    [OUTLINE] ${data.outline.title}`);
-  });
-
-  agent.on("draft:updated", (data) => {
-    console.log(`    [DRAFT] ${data.wordCount} words`);
-  });
-
-  // General preset events
   agent.on("note:saved", (data) => {
     console.log(`    [NOTE] [${data.note.category}] ${data.note.content.substring(0, 80)}...`);
   });
@@ -72,21 +59,15 @@ async function main() {
     console.log(`    [COMPLETE] ${data.summary}`);
   });
 
-  console.log(`\nUsing preset: ${preset.displayName}`);
-  console.log(`Task: ${topicArg}\n`);
+  console.log(`\nTask: ${task}\n`);
 
-  const result = await agent.run(topicArg);
+  const result = await agent.run(task);
 
   console.log("\n" + "=".repeat(60));
   console.log("RESULT:");
   console.log("=".repeat(60));
 
-  // Handle different result structures based on preset
-  if (result.article) {
-    // Blog preset
-    console.log(result.article);
-  } else if (result.answer) {
-    // General preset
+  if (result.answer) {
     console.log(result.answer);
   } else {
     console.log(JSON.stringify(result, null, 2));

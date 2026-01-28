@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import Agent from "../core/Agent.js";
 import ToolRegistry from "../core/ToolRegistry.js";
-import { getPreset } from "../presets/index.js";
+import agentConfig from "../config/index.js";
 
 class SessionManager {
   constructor() {
@@ -10,19 +10,12 @@ class SessionManager {
 
   /**
    * Create a new session
-   * @param {string} presetName - Preset to use (defaults to 'general')
    * @returns {Object} Session object
    */
-  createSession(presetName = "general") {
-    const preset = getPreset(presetName);
-    if (!preset) {
-      throw new Error(`Unknown preset: ${presetName}`);
-    }
-
+  createSession() {
     const id = uuidv4();
     const session = {
       id,
-      preset: presetName,
       status: "created",
       agent: null,
       sseClients: new Set(),
@@ -90,22 +83,16 @@ class SessionManager {
       throw new Error("Agent already running");
     }
 
-    // Load preset
-    const preset = getPreset(session.preset);
-    if (!preset) {
-      throw new Error(`Unknown preset: ${session.preset}`);
-    }
-
     session.topic = topic;
     session.status = "running";
     session.startedAt = Date.now();
 
     // Create tool registry and register tools
     const registry = new ToolRegistry();
-    registry.registerMany(preset.toolImplementations);
+    registry.registerMany(agentConfig.toolImplementations);
 
-    // Create agent with preset and registry
-    const agent = new Agent(preset, registry, { verbose: false });
+    // Create agent with config and registry
+    const agent = new Agent(agentConfig, registry, { verbose: false });
     session.agent = agent;
 
     // Set up event forwarding to SSE clients
@@ -115,9 +102,6 @@ class SessionManager {
       "plan:created",
       "step:start", "step:complete",
       "tool:start", "tool:result",
-      // Blog preset events
-      "research:added", "outline:created", "draft:updated", "article:finalized",
-      // General preset events
       "note:saved", "thought:recorded", "result:stored", "task:completed"
     ];
 
@@ -150,7 +134,6 @@ class SessionManager {
 
     return {
       id: session.id,
-      preset: session.preset,
       status: session.status,
       topic: session.topic,
       createdAt: session.createdAt,
