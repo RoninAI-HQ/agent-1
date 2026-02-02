@@ -1,4 +1,4 @@
-import { EventTypes } from "@blog-agent/shared";
+import { EventTypes } from "../events.js";
 
 /**
  * Error thrown when a user denies a tool execution.

@@ -4,7 +4,7 @@ import ContextManager from "./ContextManager.js";
 import WorkingMemory from "./WorkingMemory.js";
 import ToolExecutor from "./ToolExecutor.js";
 import Planner from "./Planner.js";
-import { EventTypes } from "@blog-agent/shared";
+import { EventTypes } from "../events.js";
 
 /**
  * Agent - Generic agent with preset-based configuration

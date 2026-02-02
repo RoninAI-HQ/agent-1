@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { EventTypes } from "@blog-agent/shared";
+import { EventTypes } from "../events.js";
 
 /**
  * PermissionManager - Human-in-the-loop tool approval system

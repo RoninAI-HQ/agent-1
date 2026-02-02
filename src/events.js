@@ -1,4 +1,4 @@
-// SSE Event Types for Agent Framework
+// Event Types for Agent Framework
 
 export const EventTypes = {
   // Phase events
@@ -29,11 +29,7 @@ export const EventTypes = {
   // Agent lifecycle events
   AGENT_STARTED: 'agent:started',
   AGENT_COMPLETE: 'agent:complete',
-  AGENT_ERROR: 'agent:error',
-
-  // Connection events
-  CONNECTED: 'connected',
-  HEARTBEAT: 'heartbeat'
+  AGENT_ERROR: 'agent:error'
 };
 
 export default EventTypes;

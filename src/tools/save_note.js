@@ -1,4 +1,4 @@
-import { EventTypes } from "@blog-agent/shared";
+import { EventTypes } from "../events.js";
 
 /**
  * Save Note Tool - Store research, decisions, and findings

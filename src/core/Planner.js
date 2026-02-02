@@ -1,5 +1,5 @@
 import client from "./client.js";
-import { EventTypes } from "@blog-agent/shared";
+import { EventTypes } from "../events.js";
 
 /**
  * Planner - Dynamic plan creation with preset awareness

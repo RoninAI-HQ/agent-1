@@ -1,10 +1,10 @@
 import "dotenv/config";
 import readline from "readline";
-import Agent from "./packages/server/src/core/Agent.js";
-import ToolRegistry from "./packages/server/src/core/ToolRegistry.js";
-import { ToolDeniedError } from "./packages/server/src/core/ToolExecutor.js";
-import PermissionManager from "./packages/server/src/core/PermissionManager.js";
-import agentConfig from "./packages/server/src/config/index.js";
+import Agent from "./src/core/Agent.js";
+import ToolRegistry from "./src/core/ToolRegistry.js";
+import { ToolDeniedError } from "./src/core/ToolExecutor.js";
+import PermissionManager from "./src/core/PermissionManager.js";
+import agentConfig from "./src/config/index.js";
 
 /**
  * Create a readline-based approval handler

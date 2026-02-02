@@ -1,4 +1,4 @@
-import { EventTypes } from "@blog-agent/shared";
+import { EventTypes } from "../events.js";
 
 /**
  * Store Result Tool - Store intermediate or final outputs

@@ -1,4 +1,4 @@
-import { EventTypes } from "@blog-agent/shared";
+import { EventTypes } from "../events.js";
 
 /**
  * Complete Task Tool - Mark the task as complete

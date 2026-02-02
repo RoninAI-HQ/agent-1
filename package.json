@@ -1,21 +1,14 @@
 {
-  "name": "blog-agent",
+  "name": "agent",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=@blog-agent/server\" \"npm run dev --workspace=@blog-agent/client\"",
-    "dev:server": "npm run dev --workspace=@blog-agent/server",
-    "dev:client": "npm run dev --workspace=@blog-agent/client",
-    "build": "npm run build --workspace=@blog-agent/client"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
+    "start": "node index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@tavily/core": "^0.7.1",
     "dotenv": "^17.2.3"
   }
 }

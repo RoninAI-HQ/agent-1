@@ -8,7 +8,7 @@ import readFile from "../tools/read_file.js";
 import writeFile from "../tools/write_file.js";
 import listFiles from "../tools/list_files.js";
 import deleteFile from "../tools/delete_file.js";
-import { EventTypes } from "@blog-agent/shared";
+import { EventTypes } from "../events.js";
 
 /**
  * Agent Configuration

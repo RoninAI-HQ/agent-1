@@ -1,9 +1,0 @@
-{
-  "name": "@blog-agent/shared",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "src/events.js",
-  "exports": {
-    ".": "./src/events.js"
-  }
-}
