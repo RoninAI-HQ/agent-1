@@ -1,6 +1,18 @@
 import { EventTypes } from "@blog-agent/shared";
 
 /**
+ * Error thrown when a user denies a tool execution.
+ * This aborts the agent run rather than letting the LLM work around it.
+ */
+export class ToolDeniedError extends Error {
+  constructor(toolName) {
+    super(`User denied tool '${toolName}'`);
+    this.name = "ToolDeniedError";
+    this.toolName = toolName;
+  }
+}
+
+/**
  * ToolExecutor - Registry-based tool execution
  *
  * Executes tools by looking them up in the registry and
@@ -12,11 +24,13 @@ class ToolExecutor {
    * @param {ToolRegistry} registry - Tool registry instance
    * @param {WorkingMemory} memory - Working memory instance
    * @param {Function} eventEmitter - Event emitter function (type, data) => void
+   * @param {PermissionManager} permissionManager - Permission manager instance (optional)
    */
-  constructor(registry, memory, eventEmitter = null) {
+  constructor(registry, memory, eventEmitter = null, permissionManager = null) {
     this.registry = registry;
     this.memory = memory;
     this.emitter = eventEmitter;
+    this.permissionManager = permissionManager;
   }
 
   /**
@@ -41,6 +55,14 @@ class ToolExecutor {
 
     let result;
     try {
+      // Check permissions if permission manager is configured
+      if (this.permissionManager) {
+        const approval = await this.permissionManager.requestApproval(toolName, input);
+        if (!approval.approved) {
+          throw new ToolDeniedError(toolName);
+        }
+      }
+
       const executor = this.registry.getExecutor(toolName);
 
       if (!executor) {
@@ -53,6 +75,9 @@ class ToolExecutor {
         });
       }
     } catch (error) {
+      if (error instanceof ToolDeniedError) {
+        throw error;
+      }
       result = { error: error.message };
     }
 

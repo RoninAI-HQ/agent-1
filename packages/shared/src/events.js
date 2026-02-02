@@ -16,6 +16,10 @@ export const EventTypes = {
   TOOL_START: 'tool:start',
   TOOL_RESULT: 'tool:result',
 
+  // Approval events
+  APPROVAL_REQUIRED: 'approval:required',
+  APPROVAL_DENIED: 'approval:denied',
+
   // Agent events
   NOTE_SAVED: 'note:saved',
   THOUGHT_RECORDED: 'thought:recorded',

@@ -4,6 +4,10 @@ import saveNote from "../tools/save_note.js";
 import think from "../tools/think.js";
 import storeResult from "../tools/store_result.js";
 import completeTask from "../tools/complete_task.js";
+import readFile from "../tools/read_file.js";
+import writeFile from "../tools/write_file.js";
+import listFiles from "../tools/list_files.js";
+import deleteFile from "../tools/delete_file.js";
 import { EventTypes } from "@blog-agent/shared";
 
 /**
@@ -27,7 +31,11 @@ const agentConfig = {
     "save_note",
     "think",
     "store_result",
-    "complete_task"
+    "complete_task",
+    "read_file",
+    "write_file",
+    "list_files",
+    "delete_file"
   ],
 
   // Tool implementations
@@ -36,7 +44,11 @@ const agentConfig = {
     saveNote,
     think,
     storeResult,
-    completeTask
+    completeTask,
+    readFile,
+    writeFile,
+    listFiles,
+    deleteFile
   ],
 
   // Initial state for working memory

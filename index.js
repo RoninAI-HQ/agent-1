@@ -1,7 +1,45 @@
 import "dotenv/config";
+import readline from "readline";
 import Agent from "./packages/server/src/core/Agent.js";
 import ToolRegistry from "./packages/server/src/core/ToolRegistry.js";
+import { ToolDeniedError } from "./packages/server/src/core/ToolExecutor.js";
+import PermissionManager from "./packages/server/src/core/PermissionManager.js";
 import agentConfig from "./packages/server/src/config/index.js";
+
+/**
+ * Create a readline-based approval handler
+ * @returns {{handler: Function, close: Function}} Approval handler and cleanup function
+ */
+function createApprovalHandler() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  const handler = async (toolName, input) => {
+    console.log(`\n[APPROVAL] Tool: ${toolName}`);
+    console.log(`           Input: ${JSON.stringify(input, null, 2)}`);
+
+    return new Promise((resolve) => {
+      rl.question("           Allow? [y]es / [n]o / [a]lways: ", (answer) => {
+        const normalized = answer.toLowerCase().trim();
+
+        if (normalized === "y" || normalized === "yes") {
+          resolve({ approved: true, persist: false });
+        } else if (normalized === "a" || normalized === "always") {
+          resolve({ approved: true, persist: true });
+        } else {
+          resolve({ approved: false, persist: false });
+        }
+      });
+    });
+  };
+
+  return {
+    handler,
+    close: () => rl.close()
+  };
+}
 
 async function main() {
   // Get task from arguments
@@ -18,8 +56,17 @@ async function main() {
   const registry = new ToolRegistry();
   registry.registerMany(agentConfig.toolImplementations);
 
-  // Create agent
-  const agent = new Agent(agentConfig, registry, { verbose: true });
+  // Create permission manager with approval handler
+  const permissionManager = new PermissionManager(process.cwd());
+  await permissionManager.loadPermissions();
+  const approvalHandler = createApprovalHandler();
+  permissionManager.setApprovalHandler(approvalHandler.handler);
+
+  // Create agent with permission manager
+  const agent = new Agent(agentConfig, registry, {
+    verbose: true,
+    permissionManager
+  });
 
   // Set up event logging
   agent.on("plan:created", (data) => {
@@ -59,24 +106,38 @@ async function main() {
     console.log(`    [COMPLETE] ${data.summary}`);
   });
 
+  agent.on("approval:denied", (data) => {
+    console.log(`    [DENIED] Tool '${data.tool}' was not approved`);
+  });
+
   console.log(`\nTask: ${task}\n`);
 
-  const result = await agent.run(task);
+  try {
+    const result = await agent.run(task);
 
-  console.log("\n" + "=".repeat(60));
-  console.log("RESULT:");
-  console.log("=".repeat(60));
+    console.log("\n" + "=".repeat(60));
+    console.log("RESULT:");
+    console.log("=".repeat(60));
 
-  if (result.answer) {
-    console.log(result.answer);
-  } else {
-    console.log(JSON.stringify(result, null, 2));
+    if (result.answer) {
+      console.log(result.answer);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+
+    console.log("\n" + "=".repeat(60));
+    console.log("STATS:");
+    console.log(JSON.stringify(result.stats, null, 2));
+    console.log("=".repeat(60));
+  } catch (error) {
+    if (error instanceof ToolDeniedError) {
+      console.log(`\n[ABORTED] ${error.message}. Task cancelled.`);
+    } else {
+      throw error;
+    }
+  } finally {
+    approvalHandler.close();
   }
-
-  console.log("\n" + "=".repeat(60));
-  console.log("STATS:");
-  console.log(JSON.stringify(result.stats, null, 2));
-  console.log("=".repeat(60));
 }
 
 main().catch(console.error);

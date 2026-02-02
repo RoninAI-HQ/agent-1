@@ -18,6 +18,7 @@ class Agent extends EventEmitter {
    * @param {Object} preset - Preset configuration
    * @param {ToolRegistry} registry - Tool registry with registered tools
    * @param {Object} options - Agent options
+   * @param {PermissionManager} options.permissionManager - Permission manager for tool approval
    */
   constructor(preset, registry, options = {}) {
     super();
@@ -32,7 +33,13 @@ class Agent extends EventEmitter {
     // Create bound emit function
     const emitFn = (type, data) => this.emit(type, data);
 
-    this.toolExecutor = new ToolExecutor(registry, this.workingMemory, emitFn);
+    // Pass permission manager to tool executor if provided
+    this.toolExecutor = new ToolExecutor(
+      registry,
+      this.workingMemory,
+      emitFn,
+      options.permissionManager || null
+    );
     this.planner = new Planner(preset, registry, emitFn);
 
     this.verbose = options.verbose ?? false;
