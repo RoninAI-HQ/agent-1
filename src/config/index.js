@@ -8,112 +8,112 @@ import readFile from "../tools/read_file.js";
 import writeFile from "../tools/write_file.js";
 import listFiles from "../tools/list_files.js";
 import deleteFile from "../tools/delete_file.js";
-import browserTools from "../tools/browser/index.js";
 import { EventTypes } from "../events.js";
+
+const BASE_TOOLS = [
+  "web_search",
+  "save_note",
+  "think",
+  "store_result",
+  "complete_task",
+  "read_file",
+  "write_file",
+  "list_files",
+  "delete_file"
+];
+
+const BASE_TOOL_IMPLEMENTATIONS = [
+  webSearch,
+  saveNote,
+  think,
+  storeResult,
+  completeTask,
+  readFile,
+  writeFile,
+  listFiles,
+  deleteFile
+];
 
 /**
  * Agent Configuration
  *
  * Configuration for the general-purpose agent that can handle any task
  * by planning and executing steps.
+ *
+ * @param {Object} options
+ * @param {string[]} [options.browserToolNames] - Browser tool name strings
+ * @param {Object[]} [options.browserTools] - Browser tool implementations
  */
-const agentConfig = {
-  // Agent identification
-  name: "agent",
-  displayName: "General Purpose Agent",
-  description: "A flexible agent that can handle any task by planning and executing steps",
+export function createAgentConfig({ browserToolNames = [], browserTools = [] } = {}) {
+  return {
+    // Agent identification
+    name: "agent",
+    displayName: "General Purpose Agent",
+    description: "A flexible agent that can handle any task by planning and executing steps",
 
-  // Workflow phases
-  phases: ["understand", "work", "deliver"],
+    // Workflow phases
+    phases: ["understand", "work", "deliver"],
 
-  // Tools available to the agent
-  tools: [
-    "web_search",
-    "save_note",
-    "think",
-    "store_result",
-    "complete_task",
-    "read_file",
-    "write_file",
-    "list_files",
-    "delete_file",
-    "browser_navigate",
-    "browser_read_page",
-    "browser_click",
-    "browser_type",
-    "browser_select",
-    "browser_scroll",
-    "browser_back",
-    "browser_close"
-  ],
+    // Tools available to the agent
+    tools: [...BASE_TOOLS, ...browserToolNames],
 
-  // Tool implementations
-  toolImplementations: [
-    webSearch,
-    saveNote,
-    think,
-    storeResult,
-    completeTask,
-    readFile,
-    writeFile,
-    listFiles,
-    deleteFile,
-    ...browserTools
-  ],
+    // Tool implementations
+    toolImplementations: [...BASE_TOOL_IMPLEMENTATIONS, ...browserTools],
 
-  // Initial state for working memory
-  initialState: {
-    notes: [],
-    thoughts: [],
-    results: {},
-    finalAnswer: null,
-    completionSummary: null
-  },
+    // Initial state for working memory
+    initialState: {
+      notes: [],
+      thoughts: [],
+      results: {},
+      finalAnswer: null,
+      completionSummary: null
+    },
 
-  // Prompt builders
-  stepPrompt,
-  planningPrompt,
+    // Prompt builders
+    stepPrompt,
+    planningPrompt,
 
-  // Context builder for step execution
-  contextBuilder: (memory) => ({
-    notes: memory.get("notes") || [],
-    thoughts: memory.get("thoughts") || [],
-    results: memory.get("results") || {},
-    finalAnswer: memory.get("finalAnswer"),
-    completionSummary: memory.get("completionSummary")
-  }),
+    // Context builder for step execution
+    contextBuilder: (memory) => ({
+      notes: memory.get("notes") || [],
+      thoughts: memory.get("thoughts") || [],
+      results: memory.get("results") || {},
+      finalAnswer: memory.get("finalAnswer"),
+      completionSummary: memory.get("completionSummary")
+    }),
 
-  // Extract final result from memory
-  extractResult: (memory) => ({
-    answer: memory.get("finalAnswer"),
-    summary: memory.get("completionSummary"),
-    notes: memory.get("notes") || [],
-    thoughts: memory.get("thoughts") || [],
-    results: memory.get("results") || {}
-  }),
+    // Extract final result from memory
+    extractResult: (memory) => ({
+      answer: memory.get("finalAnswer"),
+      summary: memory.get("completionSummary"),
+      notes: memory.get("notes") || [],
+      thoughts: memory.get("thoughts") || [],
+      results: memory.get("results") || {}
+    }),
 
-  // Extract stats from memory
-  extractStats: (memory) => ({
-    completedSteps: memory.currentStepIndex,
-    totalSteps: memory.plan?.steps?.length || 0,
-    notesCount: (memory.get("notes") || []).length,
-    thoughtsCount: (memory.get("thoughts") || []).length,
-    resultsCount: Object.keys(memory.get("results") || {}).length
-  }),
+    // Extract stats from memory
+    extractStats: (memory) => ({
+      completedSteps: memory.currentStepIndex,
+      totalSteps: memory.plan?.steps?.length || 0,
+      notesCount: (memory.get("notes") || []).length,
+      thoughtsCount: (memory.get("thoughts") || []).length,
+      resultsCount: Object.keys(memory.get("results") || {}).length
+    }),
 
-  // Events emitted by this agent
-  events: {
-    NOTE_SAVED: EventTypes.NOTE_SAVED,
-    THOUGHT_RECORDED: EventTypes.THOUGHT_RECORDED,
-    RESULT_STORED: EventTypes.RESULT_STORED,
-    TASK_COMPLETED: EventTypes.TASK_COMPLETED
-  },
+    // Events emitted by this agent
+    events: {
+      NOTE_SAVED: EventTypes.NOTE_SAVED,
+      THOUGHT_RECORDED: EventTypes.THOUGHT_RECORDED,
+      RESULT_STORED: EventTypes.RESULT_STORED,
+      TASK_COMPLETED: EventTypes.TASK_COMPLETED
+    },
 
-  // Agent configuration
-  maxIterationsPerStep: 15,
-  model: "claude-sonnet-4-20250514",
-  plannerMaxTokens: 1500,
-  stepMaxTokens: 4000
-};
+    // Agent configuration
+    maxIterationsPerStep: 15,
+    model: "claude-sonnet-4-20250514",
+    plannerMaxTokens: 1500,
+    stepMaxTokens: 4000
+  };
+}
 
-export default agentConfig;
+export default createAgentConfig();

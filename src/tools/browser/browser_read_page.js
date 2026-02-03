@@ -1,5 +1,3 @@
-import browserSession from "./session.js";
-
 const MAX_TEXT_LENGTH = 4000;
 const MAX_ELEMENTS = 50;
 
@@ -161,39 +159,41 @@ function formatOutput(data) {
   return out;
 }
 
-export default {
-  name: "browser_read_page",
-  schema: {
+export default function createBrowserReadPage(session) {
+  return {
     name: "browser_read_page",
-    description:
-      "Read the current browser page content. Returns visible text, links with CSS selectors, buttons, form inputs, and scroll position. Use this after navigating to understand what is on the page before interacting with it.",
-    input_schema: {
-      type: "object",
-      properties: {},
-      required: []
-    }
-  },
-  execute: async () => {
-    try {
-      const page = await browserSession.getPage();
-      const data = await page.evaluate(
-        extractPageContent,
-        MAX_TEXT_LENGTH,
-        MAX_ELEMENTS
-      );
-      const formatted = formatOutput(data);
+    schema: {
+      name: "browser_read_page",
+      description:
+        "Read the current browser page content. Returns visible text, links with CSS selectors, buttons, form inputs, and scroll position. Use this after navigating to understand what is on the page before interacting with it.",
+      input_schema: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    },
+    execute: async () => {
+      try {
+        const page = await session.getPage();
+        const data = await page.evaluate(
+          extractPageContent,
+          MAX_TEXT_LENGTH,
+          MAX_ELEMENTS
+        );
+        const formatted = formatOutput(data);
 
-      return {
-        success: true,
-        url: data.url,
-        title: data.title,
-        content: formatted
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: `Read page failed: ${error.message}`
-      };
+        return {
+          success: true,
+          url: data.url,
+          title: data.title,
+          content: formatted
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: `Read page failed: ${error.message}`
+        };
+      }
     }
-  }
-};
+  };
+}

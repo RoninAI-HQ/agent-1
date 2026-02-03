@@ -1,23 +1,11 @@
 import { lightpanda } from "@lightpanda/browser";
 import puppeteer from "puppeteer-core";
+import BrowserSession from "./BrowserSession.js";
 
-class BrowserSession {
+export default class LightpandaSession extends BrowserSession {
   constructor() {
+    super();
     this.proc = null;
-    this.browser = null;
-    this.page = null;
-    this._initializing = null;
-  }
-
-  async init() {
-    if (this._initializing) return this._initializing;
-    if (this.page) return;
-    this._initializing = this._doInit();
-    try {
-      await this._initializing;
-    } finally {
-      this._initializing = null;
-    }
   }
 
   async _doInit() {
@@ -47,16 +35,4 @@ class BrowserSession {
       this.proc = null;
     }
   }
-
-  isActive() {
-    return this.page !== null;
-  }
-
-  async getPage() {
-    if (!this.page) await this.init();
-    return this.page;
-  }
 }
-
-const browserSession = new BrowserSession();
-export default browserSession;
