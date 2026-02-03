@@ -8,7 +8,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "@lightpanda/browser": "^1.0.1",
     "@tavily/core": "^0.7.1",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "puppeteer-core": "^24.36.1"
   }
 }

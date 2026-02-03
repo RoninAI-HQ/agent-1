@@ -8,6 +8,7 @@ import readFile from "../tools/read_file.js";
 import writeFile from "../tools/write_file.js";
 import listFiles from "../tools/list_files.js";
 import deleteFile from "../tools/delete_file.js";
+import browserTools from "../tools/browser/index.js";
 import { EventTypes } from "../events.js";
 
 /**
@@ -35,7 +36,15 @@ const agentConfig = {
     "read_file",
     "write_file",
     "list_files",
-    "delete_file"
+    "delete_file",
+    "browser_navigate",
+    "browser_read_page",
+    "browser_click",
+    "browser_type",
+    "browser_select",
+    "browser_scroll",
+    "browser_back",
+    "browser_close"
   ],
 
   // Tool implementations
@@ -48,7 +57,8 @@ const agentConfig = {
     readFile,
     writeFile,
     listFiles,
-    deleteFile
+    deleteFile,
+    ...browserTools
   ],
 
   // Initial state for working memory
@@ -100,7 +110,7 @@ const agentConfig = {
   },
 
   // Agent configuration
-  maxIterationsPerStep: 5,
+  maxIterationsPerStep: 15,
   model: "claude-sonnet-4-20250514",
   plannerMaxTokens: 1500,
   stepMaxTokens: 4000

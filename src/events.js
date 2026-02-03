@@ -26,6 +26,9 @@ export const EventTypes = {
   RESULT_STORED: 'result:stored',
   TASK_COMPLETED: 'task:completed',
 
+  // Browser events
+  BROWSER_CLOSED: 'browser:closed',
+
   // Agent lifecycle events
   AGENT_STARTED: 'agent:started',
   AGENT_COMPLETE: 'agent:complete',

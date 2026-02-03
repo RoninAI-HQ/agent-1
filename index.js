@@ -5,11 +5,54 @@ import ToolRegistry from "./src/core/ToolRegistry.js";
 import { ToolDeniedError } from "./src/core/ToolExecutor.js";
 import PermissionManager from "./src/core/PermissionManager.js";
 import agentConfig from "./src/config/index.js";
+import browserSession from "./src/tools/browser/session.js";
 
-/**
- * Create a readline-based approval handler
- * @returns {{handler: Function, close: Function}} Approval handler and cleanup function
- */
+async function main() {
+  const task = process.argv.slice(2).join(" ");
+
+  if (!task) {
+    console.error("Usage: node index.js <task>");
+    console.error("       node index.js \"What is the capital of France?\"");
+    console.error("       node index.js \"Research the latest AI developments\"");
+    process.exit(1);
+  }
+
+  const registry = new ToolRegistry();
+  registry.registerMany(agentConfig.toolImplementations);
+
+  const permissionManager = new PermissionManager(process.cwd());
+  await permissionManager.loadPermissions();
+  const approvalHandler = createApprovalHandler();
+  permissionManager.setApprovalHandler(approvalHandler.handler);
+
+  const agent = new Agent(agentConfig, registry, {
+    verbose: true,
+    permissionManager
+  });
+
+  setupEventLogging(agent);
+
+  console.log(`\nTask: ${task}\n`);
+
+  try {
+    const result = await agent.run(task);
+    printResult(result);
+  } catch (error) {
+    if (error instanceof ToolDeniedError) {
+      console.log(`\n[ABORTED] ${error.message}. Task cancelled.`);
+    } else {
+      throw error;
+    }
+  } finally {
+    await browserSession.close();
+    approvalHandler.close();
+  }
+}
+
+main().catch(console.error);
+
+// --- Helpers ---
+
 function createApprovalHandler() {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -17,11 +60,11 @@ function createApprovalHandler() {
   });
 
   const handler = async (toolName, input) => {
-    console.log(`\n[APPROVAL] Tool: ${toolName}`);
-    console.log(`           Input: ${JSON.stringify(input, null, 2)}`);
+    console.log(`\n[APPROVAL]\nTool: ${toolName}`);
+    console.log(`Input: ${JSON.stringify(input, null, 2)}`);
 
     return new Promise((resolve) => {
-      rl.question("           Allow? [y]es / [n]o / [a]lways: ", (answer) => {
+      rl.question("Allow? [y]es / [n]o / [a]lways: ", (answer) => {
         const normalized = answer.toLowerCase().trim();
 
         if (normalized === "y" || normalized === "yes") {
@@ -35,40 +78,14 @@ function createApprovalHandler() {
     });
   };
 
-  return {
-    handler,
-    close: () => rl.close()
-  };
+  return { handler, close: () => rl.close() };
 }
 
-async function main() {
-  // Get task from arguments
-  const task = process.argv.slice(2).join(" ");
-
-  if (!task) {
-    console.error("Usage: node index.js <task>");
-    console.error("       node index.js \"What is the capital of France?\"");
-    console.error("       node index.js \"Research the latest AI developments\"");
-    process.exit(1);
-  }
-
-  // Create tool registry and register tools
-  const registry = new ToolRegistry();
-  registry.registerMany(agentConfig.toolImplementations);
-
-  // Create permission manager with approval handler
-  const permissionManager = new PermissionManager(process.cwd());
-  await permissionManager.loadPermissions();
-  const approvalHandler = createApprovalHandler();
-  permissionManager.setApprovalHandler(approvalHandler.handler);
-
-  // Create agent with permission manager
-  const agent = new Agent(agentConfig, registry, {
-    verbose: true,
-    permissionManager
+function setupEventLogging(agent) {
+  agent.on("agent:started", (data) => {
+    console.log(`\n[AGENT] Started working on topic: ${data.topic}`);
   });
 
-  // Set up event logging
   agent.on("plan:created", (data) => {
     const { plan } = data;
     console.log(`\n[PLAN] ${plan.approach}`);
@@ -110,34 +127,24 @@ async function main() {
     console.log(`    [DENIED] Tool '${data.tool}' was not approved`);
   });
 
-  console.log(`\nTask: ${task}\n`);
-
-  try {
-    const result = await agent.run(task);
-
-    console.log("\n" + "=".repeat(60));
-    console.log("RESULT:");
-    console.log("=".repeat(60));
-
-    if (result.answer) {
-      console.log(result.answer);
-    } else {
-      console.log(JSON.stringify(result, null, 2));
-    }
-
-    console.log("\n" + "=".repeat(60));
-    console.log("STATS:");
-    console.log(JSON.stringify(result.stats, null, 2));
-    console.log("=".repeat(60));
-  } catch (error) {
-    if (error instanceof ToolDeniedError) {
-      console.log(`\n[ABORTED] ${error.message}. Task cancelled.`);
-    } else {
-      throw error;
-    }
-  } finally {
-    approvalHandler.close();
-  }
+  agent.on("browser:closed", () => {
+    console.log("    [BROWSER] Closed");
+  });
 }
 
-main().catch(console.error);
+function printResult(result) {
+  console.log("\n" + "=".repeat(60));
+  console.log("RESULT:");
+  console.log("=".repeat(60));
+
+  if (result.answer) {
+    console.log(result.answer);
+  } else {
+    console.log(JSON.stringify(result, null, 2));
+  }
+
+  console.log("\n" + "=".repeat(60));
+  console.log("STATS:");
+  console.log(JSON.stringify(result.stats, null, 2));
+  console.log("=".repeat(60));
+}

@@ -101,6 +101,14 @@ Important guidelines:
 - Use "save_note" to record important findings or decisions
 - Use "store_result" to save intermediate outputs needed later
 - Use "web_search" when you need current information from the internet
+- Use "browser_navigate" to open web pages when you need to interact with a website (not just read it)
+- After navigating, ALWAYS use "browser_read_page" to understand what is on the page before interacting
+- Use "browser_click", "browser_type", "browser_select" to interact with page elements using CSS selectors from browser_read_page
+- Use "browser_scroll" to see more content on long pages, then "browser_read_page" again
+- Use "browser_back" to return to the previous page
+- Use "browser_close" when you are done with all browser tasks
+- Prefer "web_search" for simple information lookups; use browser tools when you need to interact with a specific website
+- A single step can use multiple browser tools in sequence (e.g. navigate, then read, then click, then read again)
 
 Create a realistic, efficient plan that accomplishes the goal.`;
 }
