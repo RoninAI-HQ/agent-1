@@ -215,16 +215,28 @@ function setupEventLogging(agent) {
 
   agent.on("phase:start", (data) => {
     if (data.message) {
-      console.log(`\n${bullet(fmt.cyan)} ${fmt.bold}${data.phase}${fmt.reset} ${fmt.dim}${data.message}${fmt.reset}`);
+      console.log(`${bullet(fmt.cyan)} ${fmt.bold}${data.phase}${fmt.reset} ${fmt.dim}${data.message}${fmt.reset}`);
     }
   });
 
   agent.on("step:start", (data) => {
-    console.log(`\n${bullet()} ${fmt.bold}Step ${data.stepId}/${data.totalSteps}${fmt.reset} ${data.action}`);
+    console.log(`${bullet()} ${fmt.bold}Step ${data.stepId}/${data.totalSteps}${fmt.reset} ${data.action}`);
   });
 
   agent.on("tool:start", (data) => {
-    console.log(sub(`${fmt.bold}${data.tool}${fmt.reset}`));
+    if (data.tool === "browser_navigate") {
+      console.log(sub(`${fmt.bold}${data.tool}${fmt.reset} ${fmt.dim}${data.input.url}${fmt.reset}`));
+    } else {
+      console.log(sub(`${fmt.bold}${data.tool}${fmt.reset}`));
+    }
+  });
+
+  agent.on("tool:result", (data) => {
+    if (data.tool === "browser_navigate" && data.result?.success) {
+      console.log(`    ${fmt.dim}↳ "${data.result.title}"${fmt.reset}`);
+    } else if (data.tool === "browser_read_page" && data.result?.success) {
+      console.log(`    ${fmt.dim}↳ "${data.result.title}" (${data.result.url})${fmt.reset}`);
+    }
   });
 
   agent.on("note:saved", (data) => {
@@ -255,8 +267,8 @@ function setupEventLogging(agent) {
 function printUsage() {
   console.error("Usage: node index.js [options] <task>");
   console.error("\nOptions:");
-  console.error("  --provider <name>      LLM provider (anthropic, openai). Default: anthropic");
-  console.error("  --model <name>         Model name. Default: per-provider (claude-sonnet-4-20250514, gpt-4o)");
+  console.error("  --provider <name>      LLM provider (anthropic, openai, ollama). Default: anthropic");
+  console.error("  --model <name>         Model name. Default: per-provider (claude-sonnet-4-20250514, gpt-4o, llama3.2)");
   console.error("  --browser <type>       Browser type for web tasks. Default: lightpanda");
   console.error("  --headless true/false  Run browser in headless mode. Default: true");
   console.error("\nExamples:");
@@ -267,6 +279,7 @@ function printUsage() {
   console.error("  LLM_PROVIDER    LLM provider (overridden by --provider)");
   console.error("  LLM_MODEL       Model name (overridden by --model)");
   console.error("  OPENAI_API_KEY  Required when using the openai provider");
+  console.error("  OLLAMA_BASE_URL Ollama server URL (default: http://localhost:11434/v1)");
   console.error(`\nBrowser types: ${VALID_TYPES.join(", ")} (default: lightpanda)`);
   console.error(`Providers: ${VALID_PROVIDERS.join(", ")} (default: anthropic)`);
 }

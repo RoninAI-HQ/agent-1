@@ -80,16 +80,55 @@ class Planner {
 
     const text = response.content[0].text;
 
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      const plan = JSON.parse(jsonMatch[0]);
+    const plan = this._parseJSON(text);
+    this.emit(EventTypes.PLAN_CREATED, { plan });
+    return plan;
+  }
 
-      this.emit(EventTypes.PLAN_CREATED, { plan });
+  /**
+   * Extract the first balanced JSON object from text using brace matching
+   * @private
+   */
+  _extractJSON(text) {
+    const start = text.indexOf("{");
+    if (start === -1) return null;
 
-      return plan;
-    } catch (e) {
-      throw new Error(`Failed to parse plan: ${e.message}`);
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { escape = false; continue; }
+      if (ch === "\\" && inString) { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      if (ch === "}") { depth--; if (depth === 0) return text.slice(start, i + 1); }
     }
+    return null;
+  }
+
+  /**
+   * Parse JSON from LLM output with progressive repair for local models
+   * @private
+   */
+  _parseJSON(text) {
+    const raw = this._extractJSON(text);
+    if (!raw) throw new Error("Failed to parse plan: no JSON object found in response");
+
+    // Try raw first, then apply increasingly aggressive repairs
+    const attempts = [
+      raw,
+      raw.replace(/[\x00-\x1f]/g, " "),
+      raw.replace(/[\x00-\x1f]/g, " ").replace(/,\s*([}\]])/g, "$1")
+    ];
+
+    for (const attempt of attempts) {
+      try { return JSON.parse(attempt); } catch {}
+    }
+
+    throw new Error("Failed to parse plan: LLM returned malformed JSON");
   }
 
   /**

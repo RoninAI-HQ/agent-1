@@ -5,11 +5,14 @@ class OpenAIProvider extends LLMProvider {
   constructor(options = {}) {
     super({ defaultModel: options.defaultModel || "gpt-4o" });
 
-    if (!process.env.OPENAI_API_KEY) {
+    const apiKey = options.apiKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
       throw new Error("OPENAI_API_KEY environment variable is required for OpenAI provider");
     }
 
-    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const clientOptions = { apiKey };
+    if (options.baseURL) clientOptions.baseURL = options.baseURL;
+    this.client = new OpenAI(clientOptions);
   }
 
   async createMessage({ model, maxTokens, system, tools, messages }) {
