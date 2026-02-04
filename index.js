@@ -9,6 +9,7 @@ import { createBrowserSession, VALID_TYPES } from "./src/tools/browser/sessions/
 import { BROWSER_TOOL_NAMES, createBrowserTools } from "./src/tools/browser/index.js";
 import { initLLMClient } from "./src/core/client.js";
 import { VALID_PROVIDERS, DEFAULT_MODELS } from "./src/core/providers/index.js";
+import DebugLogger from "./src/debug/DebugLogger.js";
 
 const fmt = {
   bold: "\x1b[1m",
@@ -23,7 +24,7 @@ const fmt = {
 };
 
 async function main() {
-  const { browserType, headless, provider, model, task } = parseArgs(process.argv);
+  const { browserType, headless, provider, model, debug, task } = parseArgs(process.argv);
 
   if (!task) {
     printUsage();
@@ -65,6 +66,11 @@ async function main() {
 
   setupEventLogging(agent);
 
+  if (debug) {
+    const debugLogger = new DebugLogger(agent);
+    console.log(`${fmt.yellow}●${fmt.reset} ${fmt.bold}Debug${fmt.reset} snapshots → ${fmt.dim}${debugLogger.getDir()}/${fmt.reset}`);
+  }
+
   console.log(`\n${fmt.blue}●${fmt.reset} ${fmt.bold}Task${fmt.reset}(${task})\n`);
 
   const startTime = Date.now();
@@ -96,6 +102,7 @@ function parseArgs(argv) {
   let headless = true;
   let cliProvider = null;
   let cliModel = null;
+  let debug = false;
   const taskParts = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -140,6 +147,8 @@ function parseArgs(argv) {
       }
       cliModel = args[i + 1];
       i++;
+    } else if (args[i] === "--debug") {
+      debug = true;
     } else {
       taskParts.push(args[i]);
     }
@@ -149,7 +158,7 @@ function parseArgs(argv) {
   const provider = cliProvider || process.env.LLM_PROVIDER || "anthropic";
   const model = cliModel || process.env.LLM_MODEL || null;
 
-  return { browserType, headless, provider, model, task: taskParts.join(" ") };
+  return { browserType, headless, provider, model, debug, task: taskParts.join(" ") };
 }
 
 async function createAgent(agentConfig) {
@@ -271,6 +280,7 @@ function printUsage() {
   console.error("  --model <name>         Model name. Default: per-provider (claude-sonnet-4-20250514, gpt-4o, llama3.2)");
   console.error("  --browser <type>       Browser type for web tasks. Default: lightpanda");
   console.error("  --headless true/false  Run browser in headless mode. Default: true");
+  console.error("  --debug                Write agent state snapshots to debug/ folder");
   console.error("\nExamples:");
   console.error("  node index.js \"What is the capital of France?\"");
   console.error("  node index.js --provider openai --model gpt-4o \"Summarize the news\"");

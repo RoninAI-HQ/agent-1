@@ -5,3 +5,4 @@ claude
 .agent-permissions.json
 .vscode
 projects
+/debug
