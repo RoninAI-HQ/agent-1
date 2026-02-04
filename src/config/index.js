@@ -9,6 +9,7 @@ import writeFile from "../tools/write_file.js";
 import listFiles from "../tools/list_files.js";
 import deleteFile from "../tools/delete_file.js";
 import { EventTypes } from "../events.js";
+import { DEFAULT_MODELS } from "../core/providers/index.js";
 
 const BASE_TOOLS = [
   "web_search",
@@ -44,8 +45,11 @@ const BASE_TOOL_IMPLEMENTATIONS = [
  * @param {string[]} [options.browserToolNames] - Browser tool name strings
  * @param {Object[]} [options.browserTools] - Browser tool implementations
  */
-export function createAgentConfig({ browserToolNames = [], browserTools = [] } = {}) {
+export function createAgentConfig({ browserToolNames = [], browserTools = [], provider, model } = {}) {
+  const resolvedModel = model || DEFAULT_MODELS[provider || "anthropic"];
+
   return {
+    provider,
     // Agent identification
     name: "agent",
     displayName: "General Purpose Agent",
@@ -110,7 +114,7 @@ export function createAgentConfig({ browserToolNames = [], browserTools = [] } =
 
     // Agent configuration
     maxIterationsPerStep: 15,
-    model: "claude-sonnet-4-20250514",
+    model: resolvedModel,
     plannerMaxTokens: 1500,
     stepMaxTokens: 4000
   };

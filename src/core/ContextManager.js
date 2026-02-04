@@ -1,11 +1,12 @@
 import TokenCounter from "./TokenCounter.js";
-import client from "./client.js";
+import { getLLMClient } from "./client.js";
 
 class ContextManager {
   constructor(options = {}) {
     this.maxTokens = options.maxTokens || 16000;
     this.compressionTrigger = options.compressionTrigger || 0.7;
     this.minMessagesToKeep = options.minMessagesToKeep || 6;
+    this.model = options.model || null;
     this.messages = [];
     this.summary = null;
     this.conversationGoal = null;
@@ -35,9 +36,9 @@ class ContextManager {
       return `${m.role}: ${content.substring(0, 300)}${content.length > 300 ? "..." : ""}`;
     }).join("\n\n");
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 500,
+    const response = await getLLMClient().createMessage({
+      model: this.model,
+      maxTokens: 500,
       messages: [{
         role: "user",
         content: `Summarize this conversation, preserving key facts, decisions, and any research/content produced:\n\n${formatted}\n\nCONCISE SUMMARY:`

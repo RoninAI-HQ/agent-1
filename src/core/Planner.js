@@ -1,4 +1,4 @@
-import client from "./client.js";
+import { getLLMClient } from "./client.js";
 import { EventTypes } from "../events.js";
 
 /**
@@ -72,9 +72,9 @@ class Planner {
       prompt = this.buildDefaultPrompt(goal, toolDescriptions, phaseList);
     }
 
-    const response = await client.messages.create({
-      model: this.preset.model || "claude-sonnet-4-20250514",
-      max_tokens: this.preset.plannerMaxTokens || 1500,
+    const response = await getLLMClient().createMessage({
+      model: this.preset.model,
+      maxTokens: this.preset.plannerMaxTokens || 1500,
       messages: [{ role: "user", content: prompt }]
     });
 

@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import client from "./client.js";
+import { getLLMClient } from "./client.js";
 import ContextManager from "./ContextManager.js";
 import WorkingMemory from "./WorkingMemory.js";
 import ToolExecutor from "./ToolExecutor.js";
@@ -27,7 +27,7 @@ class Agent extends EventEmitter {
     this.options = options;
 
     // Initialize components
-    this.contextManager = new ContextManager(options);
+    this.contextManager = new ContextManager({ ...options, model: preset.model });
     this.workingMemory = new WorkingMemory(preset.initialState || {});
 
     // Create bound emit function
@@ -165,16 +165,16 @@ class Agent extends EventEmitter {
 
       iterations++;
 
-      const response = await client.messages.create({
-        model: this.preset.model || "claude-sonnet-4-20250514",
-        max_tokens: this.preset.stepMaxTokens || 4000,
+      const response = await getLLMClient().createMessage({
+        model: this.preset.model,
+        maxTokens: this.preset.stepMaxTokens || 4000,
         system: systemPrompt,
         tools: toolSchemas,
         messages: messages
       });
 
       // Process response
-      if (response.stop_reason === "tool_use") {
+      if (response.stopReason === "tool_use") {
         // Add assistant message to history
         messages.push({ role: "assistant", content: response.content });
 
@@ -192,7 +192,7 @@ class Agent extends EventEmitter {
         }
 
         messages.push({ role: "user", content: toolResults });
-      } else if (response.stop_reason === "end_turn") {
+      } else if (response.stopReason === "end_turn") {
         // Step complete
         const text = response.content
           .filter(b => b.type === "text")

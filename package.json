@@ -11,6 +11,7 @@
     "@lightpanda/browser": "^1.0.1",
     "@tavily/core": "^0.7.1",
     "dotenv": "^17.2.3",
+    "openai": "^4.77.0",
     "puppeteer-core": "^24.36.1"
   }
 }

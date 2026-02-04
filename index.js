@@ -7,14 +7,39 @@ import PermissionManager from "./src/core/PermissionManager.js";
 import { createAgentConfig } from "./src/config/index.js";
 import { createBrowserSession, VALID_TYPES } from "./src/tools/browser/sessions/index.js";
 import { BROWSER_TOOL_NAMES, createBrowserTools } from "./src/tools/browser/index.js";
+import { initLLMClient } from "./src/core/client.js";
+import { VALID_PROVIDERS, DEFAULT_MODELS } from "./src/core/providers/index.js";
+
+const fmt = {
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+  reset: "\x1b[0m",
+  red: "\x1b[31m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  cyan: "\x1b[36m",
+  gray: "\x1b[90m"
+};
 
 async function main() {
-  const { browserType, headless, task } = parseArgs(process.argv);
+  const { browserType, headless, provider, model, task } = parseArgs(process.argv);
 
   if (!task) {
     printUsage();
     process.exit(1);
   }
+
+  // Initialize LLM provider
+  try {
+    initLLMClient(provider, { defaultModel: model || undefined });
+  } catch (error) {
+    console.error(`${fmt.red}●${fmt.reset} ${fmt.bold}Error${fmt.reset} ${error.message}`);
+    process.exit(1);
+  }
+
+  const displayModel = model || DEFAULT_MODELS[provider];
+  console.log(`\n${fmt.cyan}●${fmt.reset} ${fmt.bold}Provider${fmt.reset}(${provider}) ${fmt.dim}model=${displayModel}${fmt.reset}`);
 
   let session = null;
   let agentConfig = null;
@@ -28,17 +53,19 @@ async function main() {
     const browserTools = createBrowserTools(session);
     agentConfig = createAgentConfig({
       browserToolNames: BROWSER_TOOL_NAMES,
-      browserTools
+      browserTools,
+      provider,
+      model
     });
   } else {
-    agentConfig = createAgentConfig();
+    agentConfig = createAgentConfig({ provider, model });
   }
 
   const { agent, approvalHandler } = await createAgent(agentConfig);
 
   setupEventLogging(agent);
 
-  console.log(`\nTask: ${task}\n`);
+  console.log(`\n${fmt.blue}●${fmt.reset} ${fmt.bold}Task${fmt.reset}(${task})\n`);
 
   const startTime = Date.now();
   try {
@@ -47,7 +74,7 @@ async function main() {
     printResult(result, elapsed);
   } catch (error) {
     if (error instanceof ToolDeniedError) {
-      console.log(`\n[ABORTED] ${error.message}. Task cancelled.`);
+      console.log(`\n${fmt.red}●${fmt.reset} ${fmt.bold}Aborted${fmt.reset} ${error.message}`);
     } else {
       throw error;
     }
@@ -67,6 +94,8 @@ function parseArgs(argv) {
   const args = argv.slice(2);
   let browserType = "lightpanda";
   let headless = true;
+  let cliProvider = null;
+  let cliModel = null;
   const taskParts = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -80,7 +109,7 @@ function parseArgs(argv) {
         console.error(`Error: Unknown browser type "${browserType}". Valid types: ${VALID_TYPES.join(", ")}`);
         process.exit(1);
       }
-      i++; // skip the value
+      i++;
     } else if (args[i] === "--headless") {
       if (i + 1 >= args.length) {
         console.error("Error: --headless requires a value (true or false)");
@@ -92,13 +121,35 @@ function parseArgs(argv) {
         process.exit(1);
       }
       headless = val === "true";
-      i++; // skip the value
+      i++;
+    } else if (args[i] === "--provider") {
+      if (i + 1 >= args.length) {
+        console.error(`Error: --provider requires a value. Valid providers: ${VALID_PROVIDERS.join(", ")}`);
+        process.exit(1);
+      }
+      cliProvider = args[i + 1];
+      if (!VALID_PROVIDERS.includes(cliProvider)) {
+        console.error(`Error: Unknown provider "${cliProvider}". Valid providers: ${VALID_PROVIDERS.join(", ")}`);
+        process.exit(1);
+      }
+      i++;
+    } else if (args[i] === "--model") {
+      if (i + 1 >= args.length) {
+        console.error("Error: --model requires a value");
+        process.exit(1);
+      }
+      cliModel = args[i + 1];
+      i++;
     } else {
       taskParts.push(args[i]);
     }
   }
 
-  return { browserType, headless, task: taskParts.join(" ") };
+  // Resolve with env var fallbacks
+  const provider = cliProvider || process.env.LLM_PROVIDER || "anthropic";
+  const model = cliModel || process.env.LLM_MODEL || null;
+
+  return { browserType, headless, provider, model, task: taskParts.join(" ") };
 }
 
 async function createAgent(agentConfig) {
@@ -147,69 +198,81 @@ function createApprovalHandler() {
 }
 
 function setupEventLogging(agent) {
-  agent.on("agent:started", (data) => {
-    console.log(`\n[AGENT] Started working on topic: ${data.topic}`);
-  });
+  const bullet = (color = fmt.blue) => `${color}●${fmt.reset}`;
+  const sub = (text) => `  └ ${text}`;
+
+  agent.on("agent:started", () => {});
 
   agent.on("plan:created", (data) => {
     const { plan } = data;
-    console.log(`\n[PLAN] ${plan.approach}`);
-    console.log("Steps:");
+    console.log(`${bullet(fmt.green)} ${fmt.bold}Plan${fmt.reset}(${plan.approach})`);
     for (const step of plan.steps) {
-      console.log(`  ${step.id}. [${step.phase}] ${step.action} (${step.tool})`);
+      const last = step.id === plan.steps.length;
+      const connector = last ? "└" : "├";
+      console.log(`  ${connector} ${fmt.dim}${step.id}.${fmt.reset} ${step.action} ${fmt.dim}(${step.tool})${fmt.reset}`);
     }
   });
 
   agent.on("phase:start", (data) => {
-    console.log(`\n[PHASE] ${data.phase}${data.message ? `: ${data.message}` : ""}`);
+    if (data.message) {
+      console.log(`\n${bullet(fmt.cyan)} ${fmt.bold}${data.phase}${fmt.reset} ${fmt.dim}${data.message}${fmt.reset}`);
+    }
   });
 
   agent.on("step:start", (data) => {
-    console.log(`  [STEP ${data.stepId}/${data.totalSteps}] ${data.action}`);
+    console.log(`\n${bullet()} ${fmt.bold}Step ${data.stepId}/${data.totalSteps}${fmt.reset} ${data.action}`);
   });
 
   agent.on("tool:start", (data) => {
-    console.log(`    [TOOL] ${data.tool}`);
+    console.log(sub(`${fmt.bold}${data.tool}${fmt.reset}`));
   });
 
   agent.on("note:saved", (data) => {
-    console.log(`    [NOTE] [${data.note.category}] ${data.note.content.substring(0, 80)}...`);
+    console.log(sub(`${fmt.green}Note${fmt.reset} [${data.note.category}] ${data.note.content.substring(0, 80)}...`));
   });
 
   agent.on("thought:recorded", (data) => {
-    console.log(`    [THINK] ${data.thought.thought.substring(0, 80)}...`);
+    console.log(sub(`${fmt.cyan}Think${fmt.reset} ${data.thought.thought.substring(0, 100)}...`));
   });
 
   agent.on("result:stored", (data) => {
-    console.log(`    [RESULT] Stored: ${data.key}`);
+    console.log(sub(`${fmt.green}Result${fmt.reset} stored: ${fmt.bold}${data.key}${fmt.reset}`));
   });
 
   agent.on("task:completed", (data) => {
-    console.log(`    [COMPLETE] ${data.summary}`);
+    console.log(sub(`${fmt.green}Done${fmt.reset} ${data.summary}`));
   });
 
   agent.on("approval:denied", (data) => {
-    console.log(`    [DENIED] Tool '${data.tool}' was not approved`);
+    console.log(sub(`${fmt.red}Denied${fmt.reset} tool '${data.tool}' was not approved`));
   });
 
   agent.on("browser:closed", () => {
-    console.log("    [BROWSER] Closed");
+    console.log(sub(`${fmt.dim}Browser closed${fmt.reset}`));
   });
 }
 
 function printUsage() {
-  console.error("Usage: node index.js [--browser <type>] [--headless true/false] <task>");
+  console.error("Usage: node index.js [options] <task>");
+  console.error("\nOptions:");
+  console.error("  --provider <name>      LLM provider (anthropic, openai). Default: anthropic");
+  console.error("  --model <name>         Model name. Default: per-provider (claude-sonnet-4-20250514, gpt-4o)");
+  console.error("  --browser <type>       Browser type for web tasks. Default: lightpanda");
+  console.error("  --headless true/false  Run browser in headless mode. Default: true");
+  console.error("\nExamples:");
   console.error("  node index.js \"What is the capital of France?\"");
+  console.error("  node index.js --provider openai --model gpt-4o \"Summarize the news\"");
   console.error("  node index.js --browser chrome \"Search for cats on Wikipedia\"");
-  console.error("  node index.js --browser chrome --headless false \"Search for cats on Wikipedia\"");
+  console.error("\nEnvironment variables:");
+  console.error("  LLM_PROVIDER    LLM provider (overridden by --provider)");
+  console.error("  LLM_MODEL       Model name (overridden by --model)");
+  console.error("  OPENAI_API_KEY  Required when using the openai provider");
   console.error(`\nBrowser types: ${VALID_TYPES.join(", ")} (default: lightpanda)`);
-  console.error("Headless: true or false (default: true). Lightpanda only supports headless mode.");
+  console.error(`Providers: ${VALID_PROVIDERS.join(", ")} (default: anthropic)`);
 }
 
 function printResult(result, elapsed) {
-  console.log("\n" + "=".repeat(60));
-  console.log("RESULT:");
-  console.log("=".repeat(60));
+  console.log(`\n${fmt.green}●${fmt.reset} ${fmt.bold}Result${fmt.reset} ${fmt.dim}(${formatElapsed(elapsed)})${fmt.reset}`);
 
   if (result.answer) {
     console.log(result.answer);
@@ -217,10 +280,15 @@ function printResult(result, elapsed) {
     console.log(JSON.stringify(result, null, 2));
   }
 
-  console.log("\n" + "=".repeat(60));
-  console.log("STATS:");
-  console.log(JSON.stringify({ ...result.stats, elapsed: formatElapsed(elapsed) }, null, 2));
-  console.log("=".repeat(60));
+  const stats = result.stats || {};
+  const statParts = [];
+  if (stats.totalSteps) statParts.push(`${stats.completedSteps}/${stats.totalSteps} steps`);
+  if (stats.notesCount) statParts.push(`${stats.notesCount} notes`);
+  if (stats.thoughtsCount) statParts.push(`${stats.thoughtsCount} thoughts`);
+  if (stats.resultsCount) statParts.push(`${stats.resultsCount} results`);
+  if (statParts.length > 0) {
+    console.log(`\n  ${fmt.dim}${statParts.join(" · ")}${fmt.reset}`);
+  }
 }
 
 function formatElapsed(ms) {
