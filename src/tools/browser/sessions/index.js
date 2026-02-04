@@ -5,12 +5,12 @@ const VALID_TYPES = ["lightpanda", "chrome"];
 
 export { VALID_TYPES };
 
-export function createBrowserSession(type) {
+export function createBrowserSession(type, { headless = false } = {}) {
   switch (type) {
     case "lightpanda":
       return new LightpandaSession();
     case "chrome":
-      return new ChromeSession();
+      return new ChromeSession({ headless });
     default:
       throw new Error(
         `Unknown browser type: "${type}". Valid types: ${VALID_TYPES.join(", ")}`

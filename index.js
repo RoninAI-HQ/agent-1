@@ -9,7 +9,7 @@ import { createBrowserSession, VALID_TYPES } from "./src/tools/browser/sessions/
 import { BROWSER_TOOL_NAMES, createBrowserTools } from "./src/tools/browser/index.js";
 
 async function main() {
-  const { browserType, task } = parseArgs(process.argv);
+  const { browserType, headless, task } = parseArgs(process.argv);
 
   if (!task) {
     printUsage();
@@ -20,7 +20,11 @@ async function main() {
   let agentConfig;
 
   if (browserType) {
-    session = createBrowserSession(browserType);
+    if (!headless && browserType === "lightpanda") {
+      console.error("Error: Lightpanda only supports headless mode. Use --headless true or choose a different browser (e.g. chrome).");
+      process.exit(1);
+    }
+    session = createBrowserSession(browserType, { headless });
     const browserTools = createBrowserTools(session);
     agentConfig = createAgentConfig({
       browserToolNames: BROWSER_TOOL_NAMES,
@@ -36,9 +40,11 @@ async function main() {
 
   console.log(`\nTask: ${task}\n`);
 
+  const startTime = Date.now();
   try {
     const result = await agent.run(task);
-    printResult(result);
+    const elapsed = Date.now() - startTime;
+    printResult(result, elapsed);
   } catch (error) {
     if (error instanceof ToolDeniedError) {
       console.log(`\n[ABORTED] ${error.message}. Task cancelled.`);
@@ -60,6 +66,7 @@ main().catch(console.error);
 function parseArgs(argv) {
   const args = argv.slice(2);
   let browserType = null;
+  let headless = true;
   const taskParts = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -74,12 +81,24 @@ function parseArgs(argv) {
         process.exit(1);
       }
       i++; // skip the value
+    } else if (args[i] === "--headless") {
+      if (i + 1 >= args.length) {
+        console.error("Error: --headless requires a value (true or false)");
+        process.exit(1);
+      }
+      const val = args[i + 1].toLowerCase();
+      if (val !== "true" && val !== "false") {
+        console.error(`Error: --headless must be "true" or "false", got "${args[i + 1]}"`);
+        process.exit(1);
+      }
+      headless = val === "true";
+      i++; // skip the value
     } else {
       taskParts.push(args[i]);
     }
   }
 
-  return { browserType, task: taskParts.join(" ") };
+  return { browserType, headless, task: taskParts.join(" ") };
 }
 
 async function createAgent(agentConfig) {
@@ -179,14 +198,16 @@ function setupEventLogging(agent) {
 }
 
 function printUsage() {
-  console.error("Usage: node index.js [--browser <type>] <task>");
+  console.error("Usage: node index.js [--browser <type>] [--headless true/false] <task>");
   console.error("  node index.js \"What is the capital of France?\"");
-  console.error("  node index.js --browser lightpanda \"Search for cats on Wikipedia\"");
   console.error("  node index.js --browser chrome \"Search for cats on Wikipedia\"");
+  console.error("  node index.js --browser chrome --headless true \"Search for cats on Wikipedia\"");
+  console.error("  node index.js --browser lightpanda --headless true \"Search for cats on Wikipedia\"");
   console.error(`\nBrowser types: ${VALID_TYPES.join(", ")}`);
+  console.error("Headless: true or false (default: true). Lightpanda only supports headless mode.");
 }
 
-function printResult(result) {
+function printResult(result, elapsed) {
   console.log("\n" + "=".repeat(60));
   console.log("RESULT:");
   console.log("=".repeat(60));
@@ -199,6 +220,15 @@ function printResult(result) {
 
   console.log("\n" + "=".repeat(60));
   console.log("STATS:");
-  console.log(JSON.stringify(result.stats, null, 2));
+  console.log(JSON.stringify({ ...result.stats, elapsed: formatElapsed(elapsed) }, null, 2));
   console.log("=".repeat(60));
+}
+
+function formatElapsed(ms) {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = (seconds % 60).toFixed(1);
+  return `${minutes}m ${remainingSeconds}s`;
 }

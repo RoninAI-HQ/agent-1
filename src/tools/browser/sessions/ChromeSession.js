@@ -8,6 +8,11 @@ const CHROME_PATHS = {
 };
 
 export default class ChromeSession extends BrowserSession {
+  constructor({ headless = false } = {}) {
+    super();
+    this.headless = headless;
+  }
+
   async _doInit() {
     const executablePath = CHROME_PATHS[process.platform];
     if (!executablePath) {
@@ -16,7 +21,7 @@ export default class ChromeSession extends BrowserSession {
 
     this.browser = await puppeteer.launch({
       executablePath,
-      headless: true
+      headless: this.headless
     });
     this.page = await this.browser.newPage();
   }
