@@ -17,7 +17,7 @@ async function main() {
   }
 
   let session = null;
-  let agentConfig;
+  let agentConfig = null;
 
   if (browserType) {
     if (!headless && browserType === "lightpanda") {
@@ -65,7 +65,7 @@ main().catch(console.error);
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  let browserType = null;
+  let browserType = "lightpanda";
   let headless = true;
   const taskParts = [];
 
@@ -201,9 +201,8 @@ function printUsage() {
   console.error("Usage: node index.js [--browser <type>] [--headless true/false] <task>");
   console.error("  node index.js \"What is the capital of France?\"");
   console.error("  node index.js --browser chrome \"Search for cats on Wikipedia\"");
-  console.error("  node index.js --browser chrome --headless true \"Search for cats on Wikipedia\"");
-  console.error("  node index.js --browser lightpanda --headless true \"Search for cats on Wikipedia\"");
-  console.error(`\nBrowser types: ${VALID_TYPES.join(", ")}`);
+  console.error("  node index.js --browser chrome --headless false \"Search for cats on Wikipedia\"");
+  console.error(`\nBrowser types: ${VALID_TYPES.join(", ")} (default: lightpanda)`);
   console.error("Headless: true or false (default: true). Lightpanda only supports headless mode.");
 }
 
