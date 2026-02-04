@@ -3,3 +3,5 @@ claude
 .claude
 .env
 .agent-permissions.json
+.vscode
+projects
