@@ -1,47 +1,47 @@
 import "dotenv/config";
-import fs from "fs";
 import readline from "readline";
 import Agent from "./src/core/Agent.js";
 import ToolRegistry from "./src/core/ToolRegistry.js";
 import { ToolDeniedError } from "./src/core/ToolExecutor.js";
 import PermissionManager from "./src/core/PermissionManager.js";
 import { createAgentConfig } from "./src/config/index.js";
-import { createBrowserSession, VALID_TYPES } from "./src/tools/browser/sessions/index.js";
+import { createBrowserSession } from "./src/tools/browser/sessions/index.js";
 import { BROWSER_TOOL_NAMES, createBrowserTools } from "./src/tools/browser/index.js";
 import { initLLMClient } from "./src/core/client.js";
-import { VALID_PROVIDERS, DEFAULT_MODELS } from "./src/core/providers/index.js";
+import { DEFAULT_MODELS } from "./src/core/providers/index.js";
 import DebugLogger from "./src/debug/DebugLogger.js";
-
-const fmt = {
-  bold: "\x1b[1m",
-  dim: "\x1b[2m",
-  reset: "\x1b[0m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-  gray: "\x1b[90m"
-};
+import { parseCLI, generateHelp } from "./src/cli/index.js";
+import { ProgressRenderer } from "./src/display/index.js";
 
 async function main() {
-  const { browserType, headless, provider, model, debug, task } = parseArgs(process.argv);
+  const { config, errors } = parseCLI(process.argv);
 
-  if (!task) {
-    printUsage();
+  if (errors.length > 0) {
+    errors.forEach(err => console.error(`Error: ${err}`));
+    console.error("\n" + generateHelp());
     process.exit(1);
   }
+
+  const { browser: browserType, headless, provider, model, debug, task } = config;
+
+  if (!task) {
+    console.error(generateHelp());
+    process.exit(1);
+  }
+
+  // Create renderer for progress display
+  const renderer = new ProgressRenderer();
 
   // Initialize LLM provider
   try {
     initLLMClient(provider, { defaultModel: model || undefined });
   } catch (error) {
-    console.error(`${fmt.red}●${fmt.reset} ${fmt.bold}Error${fmt.reset} ${error.message}`);
+    renderer.renderError(error.message);
     process.exit(1);
   }
 
   const displayModel = model || DEFAULT_MODELS[provider];
-  console.log(`\n${fmt.cyan}●${fmt.reset} ${fmt.bold}Provider${fmt.reset}(${provider}) ${fmt.dim}model=${displayModel}${fmt.reset}`);
+  renderer.renderProvider(provider, displayModel);
 
   let session = null;
   let agentConfig = null;
@@ -65,25 +65,24 @@ async function main() {
 
   const { agent, approvalHandler } = await createAgent(agentConfig);
 
-  setupEventLogging(agent);
+  // Attach renderer to agent events
+  renderer.attach(agent);
 
   if (debug) {
     const debugLogger = new DebugLogger(agent);
-    console.log(`${fmt.yellow}●${fmt.reset} ${fmt.bold}Debug${fmt.reset} snapshots → ${fmt.dim}${debugLogger.getDir()}/${fmt.reset}`);
+    renderer.renderDebug(debugLogger.getDir());
   }
 
-  const words = task.split(/\s+/);
-  const displayTask = words.length > 50 ? words.slice(0, 50).join(" ") + "…" : task;
-  console.log(`\n${fmt.blue}●${fmt.reset} ${fmt.bold}Task${fmt.reset}(${displayTask})\n`);
+  renderer.renderTask(task);
 
   const startTime = Date.now();
   try {
     const result = await agent.run(task);
     const elapsed = Date.now() - startTime;
-    printResult(result, elapsed);
+    renderer.renderResult(result, elapsed);
   } catch (error) {
     if (error instanceof ToolDeniedError) {
-      console.log(`\n${fmt.red}●${fmt.reset} ${fmt.bold}Aborted${fmt.reset} ${error.message}`);
+      renderer.renderAborted(error.message);
     } else {
       throw error;
     }
@@ -98,95 +97,6 @@ async function main() {
 main().catch(console.error);
 
 // --- Helpers ---
-
-function parseArgs(argv) {
-  const args = argv.slice(2);
-  let browserType = "lightpanda";
-  let headless = true;
-  let cliProvider = null;
-  let cliModel = null;
-  let debug = false;
-  let taskPromptFile = null;
-  const taskParts = [];
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--browser") {
-      if (i + 1 >= args.length) {
-        console.error(`Error: --browser requires a value. Valid types: ${VALID_TYPES.join(", ")}`);
-        process.exit(1);
-      }
-      browserType = args[i + 1];
-      if (!VALID_TYPES.includes(browserType)) {
-        console.error(`Error: Unknown browser type "${browserType}". Valid types: ${VALID_TYPES.join(", ")}`);
-        process.exit(1);
-      }
-      i++;
-    } else if (args[i] === "--headless") {
-      if (i + 1 >= args.length) {
-        console.error("Error: --headless requires a value (true or false)");
-        process.exit(1);
-      }
-      const val = args[i + 1].toLowerCase();
-      if (val !== "true" && val !== "false") {
-        console.error(`Error: --headless must be "true" or "false", got "${args[i + 1]}"`);
-        process.exit(1);
-      }
-      headless = val === "true";
-      i++;
-    } else if (args[i] === "--provider") {
-      if (i + 1 >= args.length) {
-        console.error(`Error: --provider requires a value. Valid providers: ${VALID_PROVIDERS.join(", ")}`);
-        process.exit(1);
-      }
-      cliProvider = args[i + 1];
-      if (!VALID_PROVIDERS.includes(cliProvider)) {
-        console.error(`Error: Unknown provider "${cliProvider}". Valid providers: ${VALID_PROVIDERS.join(", ")}`);
-        process.exit(1);
-      }
-      i++;
-    } else if (args[i] === "--model") {
-      if (i + 1 >= args.length) {
-        console.error("Error: --model requires a value");
-        process.exit(1);
-      }
-      cliModel = args[i + 1];
-      i++;
-    } else if (args[i] === "--task-prompt-file") {
-      if (i + 1 >= args.length) {
-        console.error("Error: --task-prompt-file requires a file path");
-        process.exit(1);
-      }
-      taskPromptFile = args[i + 1];
-      i++;
-    } else if (args[i] === "--debug") {
-      debug = true;
-    } else {
-      taskParts.push(args[i]);
-    }
-  }
-
-  // Resolve with env var fallbacks
-  const provider = cliProvider || process.env.LLM_PROVIDER || "anthropic";
-  const model = cliModel || process.env.LLM_MODEL || null;
-
-  // Resolve task from file or positional args
-  let task;
-  if (taskPromptFile && taskParts.length > 0) {
-    console.error("Error: --task-prompt-file and positional task arguments are mutually exclusive");
-    process.exit(1);
-  } else if (taskPromptFile) {
-    try {
-      task = fs.readFileSync(taskPromptFile, "utf-8").trim();
-    } catch (err) {
-      console.error(`Error: Could not read task prompt file "${taskPromptFile}": ${err.message}`);
-      process.exit(1);
-    }
-  } else {
-    task = taskParts.join(" ");
-  }
-
-  return { browserType, headless, provider, model, debug, task };
-}
 
 async function createAgent(agentConfig) {
   const registry = new ToolRegistry();
@@ -231,123 +141,4 @@ function createApprovalHandler() {
   };
 
   return { handler, close: () => rl.close() };
-}
-
-function setupEventLogging(agent) {
-  const bullet = (color = fmt.blue) => `${color}●${fmt.reset}`;
-  const sub = (text) => `  └ ${text}`;
-
-  agent.on("agent:started", () => {});
-
-  agent.on("plan:created", (data) => {
-    const { plan } = data;
-    console.log(`${bullet(fmt.green)} ${fmt.bold}Plan${fmt.reset}(${plan.approach})`);
-    for (const step of plan.steps) {
-      const last = step.id === plan.steps.length;
-      const connector = last ? "└" : "├";
-      console.log(`  ${connector} ${fmt.dim}${step.id}.${fmt.reset} ${step.action} ${fmt.dim}(${step.tool})${fmt.reset}`);
-    }
-  });
-
-  agent.on("phase:start", (data) => {
-    if (data.message) {
-      console.log(`${bullet(fmt.cyan)} ${fmt.bold}${data.phase}${fmt.reset} ${fmt.dim}${data.message}${fmt.reset}`);
-    }
-  });
-
-  agent.on("step:start", (data) => {
-    console.log(`\n${bullet()} ${fmt.bold}Step ${data.stepId}/${data.totalSteps}${fmt.reset} ${data.action}`);
-  });
-
-  agent.on("tool:start", (data) => {
-    if (data.tool === "browser_navigate") {
-      console.log(sub(`${fmt.bold}${data.tool}${fmt.reset} ${fmt.dim}${data.input.url}${fmt.reset}`));
-    } else {
-      console.log(sub(`${fmt.bold}${data.tool}${fmt.reset}`));
-    }
-  });
-
-  agent.on("tool:result", (data) => {
-    if (data.tool === "browser_navigate" && data.result?.success) {
-      console.log(`    ${fmt.dim}↳ "${data.result.title}"${fmt.reset}`);
-    } else if (data.tool === "browser_read_page" && data.result?.success) {
-      console.log(`    ${fmt.dim}↳ "${data.result.title}" (${data.result.url})${fmt.reset}`);
-    }
-  });
-
-  agent.on("note:saved", (data) => {
-    console.log(sub(`${fmt.green}Note${fmt.reset} [${data.note.category}] ${data.note.content.substring(0, 80)}...`));
-  });
-
-  agent.on("thought:recorded", (data) => {
-    console.log(sub(`${fmt.cyan}Think${fmt.reset} ${data.thought.thought.substring(0, 100)}...`));
-  });
-
-  agent.on("result:stored", (data) => {
-    console.log(sub(`${fmt.green}Result${fmt.reset} stored: ${fmt.bold}${data.key}${fmt.reset}`));
-  });
-
-  agent.on("task:completed", (data) => {
-    console.log(sub(`${fmt.green}Done${fmt.reset} ${data.summary}`));
-  });
-
-  agent.on("approval:denied", (data) => {
-    console.log(sub(`${fmt.red}Denied${fmt.reset} tool '${data.tool}' was not approved`));
-  });
-
-  agent.on("browser:closed", () => {
-    console.log(sub(`${fmt.dim}Browser closed${fmt.reset}`));
-  });
-}
-
-function printUsage() {
-  console.error("Usage: node index.js [options] <task>");
-  console.error("\nOptions:");
-  console.error("  --provider <name>      LLM provider (anthropic, openai, ollama). Default: anthropic");
-  console.error("  --model <name>         Model name. Default: per-provider (claude-sonnet-4-20250514, gpt-4o, llama3.2)");
-  console.error("  --browser <type>       Browser type for web tasks. Default: lightpanda");
-  console.error("  --headless true/false  Run browser in headless mode. Default: true");
-  console.error("  --debug                Write agent state snapshots to debug/ folder");
-  console.error("  --task-prompt-file <path>  Read task prompt from a file");
-  console.error("\nExamples:");
-  console.error("  node index.js \"What is the capital of France?\"");
-  console.error("  node index.js --task-prompt-file prompt.txt");
-  console.error("  node index.js --provider openai --model gpt-4o \"Summarize the news\"");
-  console.error("  node index.js --browser chrome \"Search for cats on Wikipedia\"");
-  console.error("\nEnvironment variables:");
-  console.error("  LLM_PROVIDER    LLM provider (overridden by --provider)");
-  console.error("  LLM_MODEL       Model name (overridden by --model)");
-  console.error("  OPENAI_API_KEY  Required when using the openai provider");
-  console.error("  OLLAMA_BASE_URL Ollama server URL (default: http://localhost:11434/v1)");
-  console.error(`\nBrowser types: ${VALID_TYPES.join(", ")} (default: lightpanda)`);
-  console.error(`Providers: ${VALID_PROVIDERS.join(", ")} (default: anthropic)`);
-}
-
-function printResult(result, elapsed) {
-  console.log(`\n${fmt.green}●${fmt.reset} ${fmt.bold}Result${fmt.reset} ${fmt.dim}(${formatElapsed(elapsed)})${fmt.reset}`);
-
-  if (result.answer) {
-    console.log(result.answer);
-  } else {
-    console.log(JSON.stringify(result, null, 2));
-  }
-
-  const stats = result.stats || {};
-  const statParts = [];
-  if (stats.totalSteps) statParts.push(`${stats.completedSteps}/${stats.totalSteps} steps`);
-  if (stats.notesCount) statParts.push(`${stats.notesCount} notes`);
-  if (stats.thoughtsCount) statParts.push(`${stats.thoughtsCount} thoughts`);
-  if (stats.resultsCount) statParts.push(`${stats.resultsCount} results`);
-  if (statParts.length > 0) {
-    console.log(`\n  ${fmt.dim}${statParts.join(" · ")}${fmt.reset}`);
-  }
-}
-
-function formatElapsed(ms) {
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = (seconds % 60).toFixed(1);
-  return `${minutes}m ${remainingSeconds}s`;
 }
