@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "fs";
 import readline from "readline";
 import Agent from "./src/core/Agent.js";
 import ToolRegistry from "./src/core/ToolRegistry.js";
@@ -71,7 +72,9 @@ async function main() {
     console.log(`${fmt.yellow}●${fmt.reset} ${fmt.bold}Debug${fmt.reset} snapshots → ${fmt.dim}${debugLogger.getDir()}/${fmt.reset}`);
   }
 
-  console.log(`\n${fmt.blue}●${fmt.reset} ${fmt.bold}Task${fmt.reset}(${task})\n`);
+  const words = task.split(/\s+/);
+  const displayTask = words.length > 50 ? words.slice(0, 50).join(" ") + "…" : task;
+  console.log(`\n${fmt.blue}●${fmt.reset} ${fmt.bold}Task${fmt.reset}(${displayTask})\n`);
 
   const startTime = Date.now();
   try {
@@ -103,6 +106,7 @@ function parseArgs(argv) {
   let cliProvider = null;
   let cliModel = null;
   let debug = false;
+  let taskPromptFile = null;
   const taskParts = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -147,6 +151,13 @@ function parseArgs(argv) {
       }
       cliModel = args[i + 1];
       i++;
+    } else if (args[i] === "--task-prompt-file") {
+      if (i + 1 >= args.length) {
+        console.error("Error: --task-prompt-file requires a file path");
+        process.exit(1);
+      }
+      taskPromptFile = args[i + 1];
+      i++;
     } else if (args[i] === "--debug") {
       debug = true;
     } else {
@@ -158,7 +169,23 @@ function parseArgs(argv) {
   const provider = cliProvider || process.env.LLM_PROVIDER || "anthropic";
   const model = cliModel || process.env.LLM_MODEL || null;
 
-  return { browserType, headless, provider, model, debug, task: taskParts.join(" ") };
+  // Resolve task from file or positional args
+  let task;
+  if (taskPromptFile && taskParts.length > 0) {
+    console.error("Error: --task-prompt-file and positional task arguments are mutually exclusive");
+    process.exit(1);
+  } else if (taskPromptFile) {
+    try {
+      task = fs.readFileSync(taskPromptFile, "utf-8").trim();
+    } catch (err) {
+      console.error(`Error: Could not read task prompt file "${taskPromptFile}": ${err.message}`);
+      process.exit(1);
+    }
+  } else {
+    task = taskParts.join(" ");
+  }
+
+  return { browserType, headless, provider, model, debug, task };
 }
 
 async function createAgent(agentConfig) {
@@ -229,7 +256,7 @@ function setupEventLogging(agent) {
   });
 
   agent.on("step:start", (data) => {
-    console.log(`${bullet()} ${fmt.bold}Step ${data.stepId}/${data.totalSteps}${fmt.reset} ${data.action}`);
+    console.log(`\n${bullet()} ${fmt.bold}Step ${data.stepId}/${data.totalSteps}${fmt.reset} ${data.action}`);
   });
 
   agent.on("tool:start", (data) => {
@@ -281,8 +308,10 @@ function printUsage() {
   console.error("  --browser <type>       Browser type for web tasks. Default: lightpanda");
   console.error("  --headless true/false  Run browser in headless mode. Default: true");
   console.error("  --debug                Write agent state snapshots to debug/ folder");
+  console.error("  --task-prompt-file <path>  Read task prompt from a file");
   console.error("\nExamples:");
   console.error("  node index.js \"What is the capital of France?\"");
+  console.error("  node index.js --task-prompt-file prompt.txt");
   console.error("  node index.js --provider openai --model gpt-4o \"Summarize the news\"");
   console.error("  node index.js --browser chrome \"Search for cats on Wikipedia\"");
   console.error("\nEnvironment variables:");
